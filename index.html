@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A simple, friendly Sudoku game you can play in your browser."
+    />
+    <title>Sudoku — a little brain break</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        color: #23332d;
+        background: #f5f7f2;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        --green: #27745a;
+        --green-dark: #1d5b46;
+        --mint: #e4f1e9;
+        --line: #d7dfd9;
+        --page-background: #f5f7f2;
+        --page-glow: #e8f1e6;
+        --card-background: #fff;
+        --card-border: #e8ece7;
+        --board-outline: #52675c;
+        --grid-divider: #87978e;
+        --cell-background: #fff;
+        --given-background: #f4f6f3;
+        --related-background: #f2f7f3;
+        --selected-background: #d5ebdc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        padding: 36px 18px;
+        background:
+          radial-gradient(ellipse at 10% 5%, var(--page-glow) 0, transparent 34%),
+          var(--page-background);
+        transition: background 350ms ease;
+      }
+
+      body[data-level="moderate"] {
+        --green: #2f7196;
+        --green-dark: #205574;
+        --mint: #e2f0f7;
+        --line: #d3e1e9;
+        --page-background: #f2f7fa;
+        --page-glow: #e2eff5;
+        --card-border: #dce8ee;
+        --board-outline: #52768a;
+        --grid-divider: #899eaa;
+        --given-background: #eaf2f6;
+        --related-background: #f0f6f9;
+        --selected-background: #d8ebf4;
+      }
+
+      body[data-level="hard"] {
+        --green: #7952a2;
+        --green-dark: #593779;
+        --mint: #eee7f6;
+        --line: #ded5e8;
+        --page-background: #f7f4fa;
+        --page-glow: #ece5f3;
+        --card-border: #e6deed;
+        --board-outline: #746287;
+        --grid-divider: #a094ad;
+        --given-background: #f1edf5;
+        --related-background: #f7f3fa;
+        --selected-background: #e8def1;
+      }
+
+      body[data-level="expert"] {
+        --green: #a15b32;
+        --green-dark: #784022;
+        --mint: #f5e8df;
+        --line: #e8d8cc;
+        --page-background: #faf5f0;
+        --page-glow: #f2e7dc;
+        --card-border: #ece0d6;
+        --board-outline: #89644d;
+        --grid-divider: #aa907d;
+        --given-background: #f6efe9;
+        --related-background: #fbf5ef;
+        --selected-background: #f2e1d4;
+      }
+
+      main {
+        width: min(100%, 520px);
+        margin: 0 auto;
+      }
+
+      header {
+        margin-bottom: 22px;
+        text-align: center;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--green);
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2.2rem, 8vw, 3.2rem);
+        letter-spacing: -0.06em;
+      }
+
+      .intro {
+        margin: 8px 0 0;
+        color: #617169;
+        font-size: 1rem;
+      }
+
+      .game-card {
+        padding: clamp(16px, 5vw, 26px);
+        border: 1px solid var(--card-border);
+        border-radius: 22px;
+        background: var(--card-background);
+        box-shadow: 0 18px 50px #29493612;
+        transition: background-color 350ms ease, border-color 350ms ease;
+      }
+
+      .game-topline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+
+      .game-level {
+        display: flex;
+        flex: 1 1 124px;
+        align-items: center;
+        justify-content: space-between;
+        color: #68776f;
+        font-size: 0.9rem;
+      }
+
+      .game-level strong {
+        color: #23332d;
+      }
+
+      .level-change {
+        padding: 4px 8px;
+        border: 0;
+        border-radius: 7px;
+        background: var(--mint);
+        color: var(--green-dark);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+      }
+
+      .timer,
+      .mistakes {
+        flex: 1 1 88px;
+        color: #68776f;
+        font-size: 0.9rem;
+      }
+
+      .timer strong,
+      .mistakes strong {
+        color: #23332d;
+      }
+
+      .timer {
+        text-align: center;
+      }
+
+      dialog {
+        width: min(calc(100% - 32px), 390px);
+        padding: 24px;
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        background: var(--card-background);
+        color: #23332d;
+        box-shadow: 0 24px 70px #15251c40;
+      }
+
+      dialog::backdrop {
+        background: #14251dc9;
+        backdrop-filter: blur(3px);
+      }
+
+      .level-dialog-content {
+        display: grid;
+        gap: 16px;
+      }
+
+      .level-dialog-content h2,
+      .countdown-panel p {
+        margin: 0;
+      }
+
+      .level-dialog-content p {
+        margin: -8px 0 0;
+        color: #68776f;
+        line-height: 1.5;
+      }
+
+      .dialog-level-picker {
+        display: grid;
+        gap: 7px;
+        color: #68776f;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .dialog-level-picker select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        color: #23332d;
+        font: inherit;
+      }
+
+      .dialog-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .countdown-panel {
+        padding: 12px 0;
+        text-align: center;
+      }
+
+      .countdown-number {
+        color: var(--green);
+        font-size: clamp(4rem, 18vw, 6rem);
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .countdown-caption {
+        margin-top: 12px !important;
+        color: #68776f;
+      }
+
+      #level-form[hidden],
+      #countdown-panel[hidden] {
+        display: none;
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: repeat(9, minmax(0, 1fr));
+        overflow: hidden;
+        border: 2px solid var(--board-outline);
+        border-radius: 8px;
+        aspect-ratio: 1;
+        transition: border-color 350ms ease;
+      }
+
+      .cell {
+        display: grid;
+        min-width: 0;
+        place-items: center;
+        padding: 0;
+        border: 0;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        background: var(--cell-background);
+        color: var(--green-dark);
+        cursor: pointer;
+        font: inherit;
+        font-size: clamp(1rem, 5.2vw, 1.65rem);
+        font-weight: 600;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease;
+      }
+
+      .cell:nth-child(3n) {
+        border-right: 2px solid var(--grid-divider);
+      }
+
+      .cell:nth-child(9n) {
+        border-right: 0;
+      }
+
+      .cell:nth-child(n + 19):nth-child(-n + 27),
+      .cell:nth-child(n + 46):nth-child(-n + 54) {
+        border-bottom: 2px solid var(--grid-divider);
+      }
+
+      .cell:nth-child(n + 73) {
+        border-bottom: 0;
+      }
+
+      .cell.given {
+        background: var(--given-background);
+        color: #2d3832;
+        font-weight: 800;
+        cursor: default;
+      }
+
+      .cell.related {
+        background: var(--related-background);
+      }
+
+      .cell.same-number {
+        background: var(--mint);
+      }
+
+      .cell.selected {
+        position: relative;
+        z-index: 1;
+        background: var(--selected-background);
+        box-shadow: inset 0 0 0 2px var(--green);
+      }
+
+      .cell.incorrect {
+        background: #fff0ed;
+        color: #b84132;
+      }
+
+      .cell:focus-visible,
+      .number-button:focus-visible,
+      .action-button:focus-visible {
+        position: relative;
+        z-index: 2;
+        outline: 3px solid #e6a54d;
+        outline-offset: -3px;
+      }
+
+      .number-pad {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 7px;
+        margin-top: 16px;
+      }
+
+      .number-button,
+      .action-button {
+        min-height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--given-background);
+        color: var(--green-dark);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        transition: background 120ms ease, transform 120ms ease;
+      }
+
+      .number-button:hover,
+      .action-button:hover {
+        background: var(--mint);
+      }
+
+      .number-button:active,
+      .action-button:active {
+        transform: translateY(1px);
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .action-button {
+        flex: 1;
+        min-height: 46px;
+        padding: 0 12px;
+      }
+
+      .action-button.primary {
+        border-color: var(--green);
+        background: var(--green);
+        color: #fff;
+      }
+
+      .action-button.primary:hover {
+        background: var(--green-dark);
+      }
+
+      .message {
+        min-height: 24px;
+        margin: 14px 0 0;
+        color: #617169;
+        font-size: 0.92rem;
+        text-align: center;
+      }
+
+      .message.success {
+        color: var(--green-dark);
+        font-weight: 700;
+      }
+
+      .message.error {
+        color: #b84132;
+        font-weight: 700;
+      }
+
+      .help {
+        margin: 18px 0 0;
+        color: #78857e;
+        font-size: 0.84rem;
+        line-height: 1.5;
+        text-align: center;
+      }
+
+      @media (max-width: 380px) {
+        body {
+          padding: 24px 12px;
+        }
+
+        .number-pad {
+          gap: 4px;
+        }
+
+        .number-button {
+          min-height: 38px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">A little brain break</p>
+        <h1>Sudoku</h1>
+        <p class="intro">Take your time. You’ve got this.</p>
+      </header>
+
+      <section class="game-card" aria-label="Sudoku game">
+        <div class="game-topline">
+          <div class="game-level">
+            <span>Level: <strong id="current-level">Easy</strong></span>
+            <button id="change-level-button" class="level-change" type="button" aria-label="Change level">Change</button>
+          </div>
+          <span class="timer">Time: <strong id="timer-display">00:00</strong></span>
+          <span class="mistakes">Mistakes: <strong id="mistake-count">0</strong></span>
+        </div>
+        <div
+          id="board"
+          class="board"
+          role="grid"
+          aria-label="Sudoku puzzle"
+          aria-describedby="game-message"
+        ></div>
+        <div class="number-pad" aria-label="Choose a number or erase">
+          <button class="number-button" type="button" data-value="1" aria-label="Enter 1">1</button>
+          <button class="number-button" type="button" data-value="2" aria-label="Enter 2">2</button>
+          <button class="number-button" type="button" data-value="3" aria-label="Enter 3">3</button>
+          <button class="number-button" type="button" data-value="4" aria-label="Enter 4">4</button>
+          <button class="number-button" type="button" data-value="5" aria-label="Enter 5">5</button>
+          <button class="number-button" type="button" data-value="6" aria-label="Enter 6">6</button>
+          <button class="number-button" type="button" data-value="7" aria-label="Enter 7">7</button>
+          <button class="number-button" type="button" data-value="8" aria-label="Enter 8">8</button>
+          <button class="number-button" type="button" data-value="9" aria-label="Enter 9">9</button>
+          <button id="erase-button" class="number-button" type="button">Erase</button>
+        </div>
+        <div class="actions">
+          <button id="check-button" class="action-button primary" type="button">Check puzzle</button>
+          <button id="reset-button" class="action-button" type="button">Reset puzzle</button>
+        </div>
+        <p id="game-message" class="message" role="status" aria-live="polite">
+          Select an empty square, then choose a number.
+        </p>
+      </section>
+
+      <p class="help">
+        Each row, column, and 3 × 3 square needs the numbers 1 to 9, with no repeats.
+        You can also use your keyboard.
+      </p>
+    </main>
+
+    <dialog id="level-dialog" aria-labelledby="level-dialog-title">
+      <form id="level-form" class="level-dialog-content">
+        <h2 id="level-dialog-title">Choose your level</h2>
+        <p>Pick a difficulty and get ready to play.</p>
+        <label class="dialog-level-picker" for="level-select">
+          <span>Level</span>
+          <select id="level-select">
+            <option value="easy">Easy</option>
+            <option value="moderate">Moderate</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+          </select>
+        </label>
+        <div class="dialog-actions">
+          <button id="start-game-button" class="action-button primary" type="button">Start game</button>
+          <button id="cancel-level-button" class="action-button" type="button" hidden>Cancel</button>
+        </div>
+      </form>
+      <div id="countdown-panel" class="countdown-panel" role="status" aria-live="assertive" hidden>
+        <p id="countdown-number" class="countdown-number">3</p>
+        <p class="countdown-caption">Get ready!</p>
+      </div>
+    </dialog>
+
+    <script>
+      const puzzleSets = {
+        easy: [
+          "530070000",
+          "600195000",
+          "098000060",
+          "800060003",
+          "400803001",
+          "700020006",
+          "060000280",
+          "000419005",
+          "000080079",
+        ],
+        moderate: [
+          "030000000",
+          "600195000",
+          "098000060",
+          "800060003",
+          "400803001",
+          "700020006",
+          "060000280",
+          "000419000",
+          "000080079",
+        ],
+        hard: [
+          "530070000",
+          "000195000",
+          "008000060",
+          "800060003",
+          "400800001",
+          "700020000",
+          "060000280",
+          "000019005",
+          "000000079",
+        ],
+        expert: [
+          "030070000",
+          "000105000",
+          "098000060",
+          "800060003",
+          "400003001",
+          "000020000",
+          "060000280",
+          "000409005",
+          "000000070",
+        ],
+      };
+
+      const solution = [
+        "534678912",
+        "672195348",
+        "198342567",
+        "859761423",
+        "426853791",
+        "713924856",
+        "961537284",
+        "287419635",
+        "345286179",
+      ];
+
+      const board = document.querySelector("#board");
+      const message = document.querySelector("#game-message");
+      const mistakeCount = document.querySelector("#mistake-count");
+      const timerDisplay = document.querySelector("#timer-display");
+      const levelSelect = document.querySelector("#level-select");
+      const currentLevelDisplay = document.querySelector("#current-level");
+      const levelDialog = document.querySelector("#level-dialog");
+      const levelForm = document.querySelector("#level-form");
+      const countdownPanel = document.querySelector("#countdown-panel");
+      const countdownNumber = document.querySelector("#countdown-number");
+      const cancelLevelButton = document.querySelector("#cancel-level-button");
+      let puzzle = puzzleSets.easy;
+      let currentLevel = "easy";
+      let selectedCell = null;
+      let mistakes = 0;
+      let elapsedSeconds = 0;
+      let timerStartedAt = null;
+      let timerInterval = null;
+      let countdownInterval = null;
+      let gameStarted = false;
+
+      const cells = puzzle.flatMap((row, rowIndex) =>
+        [...row].map((value, columnIndex) => {
+          const cell = document.createElement("button");
+          cell.type = "button";
+          cell.className = "cell";
+          cell.setAttribute("role", "gridcell");
+          cell.dataset.row = rowIndex;
+          cell.dataset.column = columnIndex;
+          cell.dataset.solution = solution[rowIndex][columnIndex];
+          cell.dataset.given = value !== "0";
+          cell.textContent = value === "0" ? "" : value;
+          cell.setAttribute(
+            "aria-label",
+            `Row ${rowIndex + 1}, column ${columnIndex + 1}${value === "0" ? ", empty" : `, ${value}, given`}`,
+          );
+          if (value !== "0") {
+            cell.classList.add("given");
+            cell.disabled = true;
+          }
+          cell.addEventListener("click", () => selectCell(cell));
+          board.append(cell);
+          return cell;
+        }),
+      );
+
+      function selectCell(cell) {
+        if (cell.dataset.given === "true") return;
+        selectedCell = cell;
+        updateHighlights();
+      }
+
+      function updateHighlights() {
+        for (const cell of cells) {
+          cell.classList.toggle("selected", cell === selectedCell);
+          cell.classList.toggle(
+            "related",
+            selectedCell !== null &&
+              (cell.dataset.row === selectedCell.dataset.row ||
+                cell.dataset.column === selectedCell.dataset.column ||
+                (Math.floor(Number(cell.dataset.row) / 3) ===
+                  Math.floor(Number(selectedCell.dataset.row) / 3) &&
+                  Math.floor(Number(cell.dataset.column) / 3) ===
+                    Math.floor(Number(selectedCell.dataset.column) / 3))),
+          );
+          cell.classList.toggle(
+            "same-number",
+            selectedCell !== null &&
+              selectedCell.textContent !== "" &&
+              cell.textContent === selectedCell.textContent,
+          );
+        }
+      }
+
+      function updateTimer() {
+        if (timerStartedAt !== null) {
+          elapsedSeconds = Math.floor((Date.now() - timerStartedAt) / 1000);
+        }
+        const hours = Math.floor(elapsedSeconds / 3600);
+        const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+        const seconds = elapsedSeconds % 60;
+        timerDisplay.textContent = hours > 0
+          ? `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+          : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      }
+
+      function startTimer() {
+        if (timerInterval !== null) return;
+        timerStartedAt = Date.now() - elapsedSeconds * 1000;
+        updateTimer();
+        timerInterval = setInterval(updateTimer, 1000);
+      }
+
+      function stopTimer() {
+        if (timerInterval === null) return;
+        clearInterval(timerInterval);
+        timerInterval = null;
+        updateTimer();
+        timerStartedAt = null;
+      }
+
+      function resetTimer() {
+        if (timerInterval !== null) clearInterval(timerInterval);
+        timerInterval = null;
+        timerStartedAt = null;
+        elapsedSeconds = 0;
+        updateTimer();
+      }
+
+      function enterNumber(value) {
+        if (selectedCell === null || selectedCell.dataset.given === "true") {
+          message.textContent = "Select an empty square first.";
+          message.classList.remove("success", "error");
+          return;
+        }
+
+        const isRepeatedValue = selectedCell.textContent === value;
+        selectedCell.textContent = value;
+        const row = Number(selectedCell.dataset.row) + 1;
+        const column = Number(selectedCell.dataset.column) + 1;
+        const isIncorrect = value !== selectedCell.dataset.solution;
+        if (isIncorrect && !isRepeatedValue) {
+          mistakes += 1;
+          mistakeCount.textContent = mistakes;
+        }
+        selectedCell.classList.toggle("incorrect", isIncorrect);
+        selectedCell.setAttribute(
+          "aria-label",
+          `Row ${row}, column ${column}, ${value}${isIncorrect ? ", incorrect" : ""}`,
+        );
+        message.textContent = isIncorrect
+          ? `Incorrect number in row ${row}, column ${column}.`
+          : `Correct number in row ${row}, column ${column}.`;
+        message.classList.toggle("error", isIncorrect);
+        message.classList.toggle("success", !isIncorrect);
+        updateHighlights();
+      }
+
+      function eraseNumber() {
+        if (selectedCell === null || selectedCell.dataset.given === "true") {
+          message.textContent = "Select an empty square first.";
+          message.classList.remove("success", "error");
+          return;
+        }
+        selectedCell.textContent = "";
+        selectedCell.setAttribute(
+          "aria-label",
+          `Row ${Number(selectedCell.dataset.row) + 1}, column ${Number(selectedCell.dataset.column) + 1}, empty`,
+        );
+        selectedCell.classList.remove("incorrect");
+        message.textContent = "Square cleared.";
+        message.classList.remove("success", "error");
+        updateHighlights();
+      }
+
+      function checkPuzzle() {
+        const emptyCells = cells.filter((cell) => cell.textContent === "");
+        if (emptyCells.length > 0) {
+          message.textContent = `You still have ${emptyCells.length} empty ${
+            emptyCells.length === 1 ? "square" : "squares"
+          }. Keep going!`;
+          message.classList.remove("success", "error");
+          return;
+        }
+
+        const wrongCells = cells.filter(
+          (cell) => cell.textContent !== cell.dataset.solution,
+        );
+        cells.forEach((cell) =>
+          cell.classList.toggle("incorrect", wrongCells.includes(cell)),
+        );
+        if (wrongCells.length === 0) {
+          message.textContent = "Perfect! You solved the puzzle. Nice work!";
+          message.classList.add("success");
+          message.classList.remove("error");
+          stopTimer();
+        } else {
+          message.textContent = `Not quite — ${wrongCells.length} ${
+            wrongCells.length === 1 ? "square needs" : "squares need"
+          } another look.`;
+          message.classList.remove("success");
+          message.classList.add("error");
+        }
+      }
+
+      function resetPuzzle(messageText = "Puzzle reset. Select an empty square to begin.") {
+        for (const cell of cells) {
+          const row = Number(cell.dataset.row);
+          const column = Number(cell.dataset.column);
+          const value = puzzle[row][column];
+          const isGiven = value !== "0";
+          cell.textContent = isGiven ? value : "";
+          cell.dataset.given = isGiven;
+          cell.classList.toggle("given", isGiven);
+          cell.disabled = isGiven;
+          cell.classList.remove("incorrect");
+          cell.setAttribute(
+            "aria-label",
+            `Row ${row + 1}, column ${column + 1}${isGiven ? `, ${value}, given` : ", empty"}`,
+          );
+        }
+        mistakes = 0;
+        mistakeCount.textContent = mistakes;
+        selectedCell = null;
+        message.textContent = messageText;
+        message.classList.remove("success", "error");
+        resetTimer();
+        updateHighlights();
+      }
+
+      function startGame(level) {
+        currentLevel = level;
+        puzzle = puzzleSets[level];
+        document.body.dataset.level = level;
+        levelSelect.value = level;
+        currentLevelDisplay.textContent = levelSelect.selectedOptions[0].textContent;
+        if (!levelDialog.open) levelDialog.showModal();
+        resetPuzzle("Get ready!");
+        levelForm.hidden = true;
+        countdownPanel.hidden = false;
+        let count = 3;
+        countdownNumber.textContent = count;
+        countdownInterval = setInterval(() => {
+          count -= 1;
+          if (count > 0) {
+            countdownNumber.textContent = count;
+            return;
+          }
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+          levelDialog.close();
+          levelForm.hidden = false;
+          countdownPanel.hidden = true;
+          gameStarted = true;
+          message.textContent = "The timer is running. Good luck!";
+          startTimer();
+        }, 1000);
+      }
+
+      function openLevelDialog() {
+        levelSelect.value = currentLevel;
+        levelForm.hidden = false;
+        countdownPanel.hidden = true;
+        cancelLevelButton.hidden = !gameStarted;
+        if (!levelDialog.open) levelDialog.showModal();
+      }
+
+      document.querySelectorAll(".number-button[data-value]").forEach((button) => {
+        button.addEventListener("click", () => enterNumber(button.dataset.value));
+      });
+
+      document.querySelector("#erase-button").addEventListener("click", eraseNumber);
+      document.querySelector("#check-button").addEventListener("click", checkPuzzle);
+      document.querySelector("#reset-button").addEventListener("click", () => startGame(currentLevel));
+      document.querySelector("#change-level-button").addEventListener("click", openLevelDialog);
+      document.querySelector("#start-game-button").addEventListener("click", () => {
+        startGame(levelSelect.value);
+      });
+      cancelLevelButton.addEventListener("click", () => levelDialog.close());
+      levelDialog.addEventListener("cancel", (event) => {
+        if (!gameStarted || countdownInterval !== null) event.preventDefault();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (levelDialog.open) return;
+        if (/^[1-9]$/.test(event.key)) {
+          enterNumber(event.key);
+        } else if (event.key === "Backspace" || event.key === "Delete" || event.key === "0") {
+          eraseNumber();
+        } else if (selectedCell !== null && event.key.startsWith("Arrow")) {
+          event.preventDefault();
+          const row = Number(selectedCell.dataset.row);
+          const column = Number(selectedCell.dataset.column);
+          const rowDelta = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+          const columnDelta = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+          const nextRow = Math.max(0, Math.min(8, row + rowDelta));
+          const nextColumn = Math.max(0, Math.min(8, column + columnDelta));
+          const nextCell = cells[nextRow * 9 + nextColumn];
+          if (!nextCell.disabled) selectCell(nextCell);
+        }
+      });
+
+      updateHighlights();
+      openLevelDialog();
+    </script>
+  </body>
+</html>
